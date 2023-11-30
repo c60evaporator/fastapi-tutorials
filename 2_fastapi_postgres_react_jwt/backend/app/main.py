@@ -14,11 +14,6 @@ import os
 import crud, models, schemas
 from database import SessionLocal, engine
 
-
-SECRET_KEY = os.environ['SECRET_KEY']  # シークレットキー
-ALGORITHM = os.environ['ALGORITHM']  # JWTの署名アルゴリズム
-
-
 # テーブルを作成
 models.Base.metadata.create_all(bind=engine)
 
@@ -33,7 +28,9 @@ def get_db():
     finally:
         db.close()
 
-###### 認証関係のインスタンス ######
+###### JWT認証関係 ######
+SECRET_KEY = os.environ['SECRET_KEY']  # シークレットキー
+ALGORITHM = os.environ['ALGORITHM']  # JWTの署名アルゴリズム
 # パスワードのハッシュ化用インスタンス作成（パスワード登録を含む場合のみ）
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # OAuth2認証用Bearerトークンのスキーマ
