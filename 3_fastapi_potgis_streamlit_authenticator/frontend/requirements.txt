@@ -1,0 +1,8 @@
+streamlit
+streamlit-aggrid
+streamlit-authenticator
+streamlit-folium
+folium
+geojson
+shapely
+pyproj

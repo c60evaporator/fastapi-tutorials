@@ -1,0 +1,112 @@
+version: '3.7'
+
+services:
+  # Backend Server (FastAPI)
+  backend:
+    container_name: backend-fastapi
+    image: fastapi_py311
+    build:
+      context: $PWD/1_fastapi_postgres_streamlit/backend
+      dockerfile: dockerfile
+    environment:
+      # DBの認証情報を環境変数で渡す
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      # DBサーバーが先に起動する必要があるので`depends_on`を指定しておく
+      db:
+        condition: service_healthy  # service_healthyでヘルスチェック通るまで待つ
+    volumes:
+      # FastAPI用スクリプトが格納された/appフォルダをマウントする
+      # "ホストOSのパス:コンテナにおけるパス"でマウントできる
+      - $PWD/1_fastapi_postgres_streamlit/backend/app:/app
+    expose:
+      # frontend-backendサーバ間でポート公開 (8000番ポート)
+      - ${BACKEND_PORT}
+    networks:
+      # web-backendサーバ間のネットワーク
+      - front_nw
+      # backend-dbサーバ間のネットワーク
+      - back_nw
+
+  # Database Server (Postgres)
+  db:
+    image: postgres:13.3
+    container_name: ${DB_HOST}
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: "Asia/Tokyo"
+      PGUSER: ${POSTGRES_USER}  # ヘルスチェック用のユーザ名 (https://stackoverflow.com/questions/60193781/postgres-with-docker-compose-gives-fatal-role-root-does-not-exist-error)
+    healthcheck:
+      # ヘルスチェック (https://github.com/peter-evans/docker-compose-healthcheck/blob/master/README_JP.md)
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    expose:
+      # app-dbサーバ間でポート公開
+      - 5432
+    volumes:
+      - $PWD/1_fastapi_postgres_streamlit/db/db_server:/var/lib/postgresql/data
+    networks:
+      # backend-dbサーバ間のネットワーク
+      - back_nw
+      # pgadmin用ネットワーク
+      - pgadmin_nw
+
+  # Frontend Server (Streamlit)
+  frontend:
+    container_name: frontend-streamlit
+    image: streamlit # ビルドされるDockerイメージ名を指定
+    build:
+      context: $PWD/1_fastapi_postgres_streamlit/frontend
+      dockerfile: Dockerfile
+    environment:
+      # バックエンドサーバーのアドレスを環境変数で渡す
+      BACKEND_HOST: ${BACKEND_HOST}
+      BACKEND_PORT: ${BACKEND_PORT}
+    depends_on:
+      # バックエンドサーバーが先に起動する必要があるので`depends_on`を指定しておく
+      - backend
+    ports:
+      # 外部向けに80番ポートを公開 (左がホスト側:右がコンテナ側のポート)
+      - 80:8501
+    volumes:
+      # Streamlit用スクリプトが格納された/appフォルダをマウントする
+      - $PWD/1_fastapi_postgres_streamlit/frontend/app:/app
+    networks:
+      # web-backendサーバ間のネットワーク
+      - front_nw
+
+  # Database management (PGAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    ports:
+      # 外部向けに81番ポートを公開 (左がホスト側:右がコンテナ側のポート)
+      - 81:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      # pgadmin用ネットワーク
+      - pgadmin_nw
+
+networks:
+  # web-backendサーバ間ネットワーク
+  front_nw:
+    name: frontend-network
+    driver: bridge
+  # backend-dbサーバ間ネットワーク
+  back_nw:
+    name: backend-network
+    driver: bridge
+  # pgadmin用ネットワーク
+  pgadmin_nw:
+    name: pgadmin-network
+    driver: bridge
