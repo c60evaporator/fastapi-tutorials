@@ -38,12 +38,12 @@ def authenticate_user(db: Session, username: str, password: str, pwd_context: Cr
 
 # アクセストークンを作成
 def create_access_token(data: dict):
-    expires_delta = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_DAYS)
     to_encode = data.copy()
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return encoded_jwt, expire
 
 
 ###### Read向けの処理 ######
@@ -110,11 +110,11 @@ def update_item(db: Session, item: schemas.ItemCreate, item_id: int):
         raise HTTPException(status_code=404, detail="The specified item_id doesn't exist")
     # Update実行
     db.query(models.Item).filter_by(
-        item_id=item_id).update(
+        owner_id=item_id).update(
         item.dict())
     db.commit()
     # Updateしたデータを取得して返す
-    db_item = db.query(models.Item).filter(models.Item.item_id == item_id).first()
+    db_item = db.query(models.Item).filter(models.Item.owner_id == item_id).first()
     return db_item
 
 
@@ -122,7 +122,7 @@ def update_item(db: Session, item: schemas.ItemCreate, item_id: int):
 # "items"テーブルの特定のitem_idのレコードを削除
 def delete_item(db: Session, item_id: int):
     # 削除対象のItemを探す
-    item = db.get(models.User, item_id)
+    item = db.get(models.Item, item_id)
     if not item:  # 指定したitem_idが存在しないとき
         raise HTTPException(status_code=404, detail="The specified item_id doesn't exist")
     # Delete実行
@@ -140,7 +140,7 @@ def delete_user(db: Session, user_id: int):
     # 先に外部キーのレコードを削除（"items"テーブルのowner_idが指定したuser_idのレコード）
     items = db.query(models.Item).filter(models.Item.owner_id == user_id).all()
     for item in items:
-        delete_item(db, item.item_id)
+        delete_item(db, item.owner_id)
     # Delete実行
     db.delete(user)
     db.commit()

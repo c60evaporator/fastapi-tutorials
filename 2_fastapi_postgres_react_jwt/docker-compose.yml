@@ -4,7 +4,7 @@ services:
   # Backend Server (FastAPI)
   backend:
     container_name: backend-fastapi
-    image: fastapi_jwt_py311
+    image: fastapi_py311_jwt
     build:
       context: $PWD/2_fastapi_postgres_react_jwt/backend
       dockerfile: Dockerfile

@@ -10,6 +10,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 import os
+from datetime import datetime
 
 import crud, models, schemas
 from database import SessionLocal, engine
@@ -39,6 +40,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expiration: datetime
 # トークンの中身
 class TokenData(BaseModel):
     username: Union[str, None] = None
@@ -80,8 +82,8 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = crud.create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token, expire = crud.create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer", "expiration": expire}
 
 ###### GET ######
 # ユーザー一覧を取得するAPI（GET）
